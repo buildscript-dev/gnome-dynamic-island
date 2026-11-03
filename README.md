@@ -8,6 +8,8 @@ comes back in the overview.
 
 ![preview](preview.png)
 
+![control center](media-controls.png)
+
 ## Install
 
 ```sh
@@ -31,12 +33,27 @@ Settings: `gnome-extensions prefs dynamic-island@buildscript-dev.github.io`.
 - **Expanded** (hover or click), scroll for pages: Now Playing with synced
   lyrics (lrclib.net) and a seekable scrubber, Home (clock, week, timers,
   stopwatch, Focus), History.
+- **Control Center** page (the top bar is hidden, so this replaces Quick
+  Settings): Wi-Fi, Bluetooth, Focus, Night Light, Dark Style, Stay Awake,
+  power mode, volume and brightness sliders, screenshot, settings, lock,
+  power off, laptop battery and phone battery (tap the phone to ring it).
 - Orange dot while an app uses the microphone.
+
+## Synced with the laptop and phone
+
+- Follows the screen you work on (or pin it to the laptop or external monitor).
+- Alerts for power mode, Night Light, audio output switches, Caps Lock,
+  keyboard layout and workspace switches.
+- Phone through GSConnect: connect/disconnect and battery alerts, battery in
+  Home and Controls, ring your phone. Phone notifications and calls come in
+  as GNOME notifications and show in the island. Pair the phone with the
+  KDE Connect app first (Settings > Devices > Open GSConnect).
 
 ## Gestures
 
-Hover or click to open, scroll to page, middle-click play/pause,
-right-click dismisses a notification or snoozes an alarm.
+Hover or click to open, scroll to page (or set scrolling to change the
+volume), middle-click play/pause, right-click dismisses a notification or
+snoozes an alarm. **Super+Alt+I** opens or closes the island.
 
 ## D-Bus
 
@@ -50,7 +67,7 @@ call Alert charging "Hello" "42%"; call Hud volume 40
 
 ## Not yet ported
 
-Genie minimize, phone (GSConnect), earbuds, call view.
+Genie minimize, earbuds, call view.
 
 ## License
 

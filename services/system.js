@@ -36,6 +36,10 @@ export class SystemService extends EventEmitter {
         this._initMic();
     }
 
+    get nm() {
+        return this._nm ?? null;
+    }
+
     get _quiet() {
         return (GLib.get_monotonic_time() - this._born) / 1000 < STARTUP_QUIET_MS;
     }
@@ -145,6 +149,8 @@ export class SystemService extends EventEmitter {
                 return;
             }
             this._lastConn = this._nm.primary_connection?.get_id() ?? null;
+            this._nmWifiId = this._nm.connect('notify::wireless-enabled', () => this.emit('changed'));
+            this.emit('changed');
             this._nmId = this._nm.connect('notify::primary-connection', () => {
                 const conn = this._nm.primary_connection;
                 const id = conn?.get_id() ?? null;
@@ -252,6 +258,8 @@ export class SystemService extends EventEmitter {
             bus.signal_unsubscribe(id);
         if (this._nm && this._nmId)
             this._nm.disconnect(this._nmId);
+        if (this._nm && this._nmWifiId)
+            this._nm.disconnect(this._nmWifiId);
         if (this._dndId)
             this._notifSettings.disconnect(this._dndId);
         if (this._recId)

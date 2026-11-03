@@ -5,6 +5,8 @@
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
@@ -12,7 +14,7 @@ import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import {G, geometry, plain, formatTime} from './lib/model.js';
 import {Spring, SpringDriver} from './lib/spring.js';
 import {glyph} from './views/widgets.js';
-import {IdleView, CompactView, HudView, AlertView, NotificationView, ExpandedView, liveGlyph} from './views/views.js';
+import {IdleView, CompactView, HudView, AlertView, NotificationView, ExpandedView, WorkspaceView, liveGlyph} from './views/views.js';
 
 const NOTIFICATION_MS = 5000;
 const CRITICAL_MS = 12000;
@@ -21,7 +23,9 @@ const HISTORY_MAX = 40;
 const BUBBLE_GAP = 6;
 
 export class Island {
-    constructor({settings, path, mpris, media, system, timers, hooks}) {
+    constructor({settings, path, mpris, media, system, timers, hooks, laptop, phone}) {
+        this.laptop = laptop;
+        this.phone = phone;
         this.settings = settings;
         this.path = path;
         this.mpris = mpris;
@@ -156,10 +160,35 @@ export class Island {
         on(this.timers, 'stopwatch-finished', (_t, secs) =>
             this._addHistory({icon: G.stopwatch, tint: 'orange', title: 'Stopwatch', body: formatTime(secs)}));
         on(this.hooks, 'osd', (_h, a) => this.push(a));
+        on(this.laptop, 'alert', (_l, a) => {
+            const userAction = a.source === 'stay-awake';
+            if (userAction || this.settings.get_boolean('laptop-alerts'))
+                this.push(a);
+        });
+        on(this.laptop, 'changed', () => this._refresh());
+        on(this.laptop, 'workspace', (_l, w) => {
+            if (this.settings.get_boolean('show-workspaces') && !this._expanded)
+                this.push({kind: 'workspace', ...w, duration: 900});
+        });
+        on(this.phone, 'alert', (_p, a) => {
+            if (this.settings.get_boolean('phone-alerts'))
+                this.push(a);
+        });
+        on(this.phone, 'changed', () => this._refresh());
+        on(global.display, 'notify::focus-window', () => this._followMonitor());
+        on(Main.layoutManager, 'monitors-changed', () => this._followMonitor());
         on(this.hooks, 'notification', (_h, n) => this._onNotification(n));
 
-        on(this.settings, 'changed', () => this._sync(true));
-        on(Main.layoutManager, 'monitors-changed', () => this._applyGeometry());
+        on(this.settings, 'changed', (_s, key) => {
+            if (key === 'monitor')
+                this._followMonitor();
+            if (key !== 'first-run' && key !== 'alarm-time')
+                this._sync(true);
+        });
+        on(Main.layoutManager, 'monitors-changed', () => {
+            this._monitor = null;
+            this._applyGeometry();
+        });
         on(Main.overview, 'showing', () => this._sync());
         on(Main.overview, 'hidden', () => this._sync());
 
@@ -168,6 +197,17 @@ export class Island {
             return GLib.SOURCE_CONTINUE;
         });
         this._fastTickId = 0;
+
+        Main.wm.addKeybinding('toggle-shortcut', this.settings, Meta.KeyBindingFlags.NONE,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._expand(!this._expanded, false));
+
+        if (this.settings.get_boolean('first-run')) {
+            this._arm('welcome', 2500, () => {
+                this.push({kind: 'alert', source: 'welcome', icon: G.music, tint: 'blue',
+                    title: 'Hover or click me', value: 'Dynamic Island', duration: 5000});
+                this.settings.set_boolean('first-run', false);
+            });
+        }
     }
 
     // --- public API (also used over D-Bus) ---------------------------------------
@@ -228,7 +268,7 @@ export class Island {
         const pages = [];
         if (this.mpris.active)
             pages.push('player');
-        pages.push('home', 'history');
+        pages.push('home', 'controls', 'history');
         return pages;
     }
 
@@ -378,8 +418,15 @@ export class Island {
         this._lastScroll = now;
 
         if (!this._expanded) {
-            if (dir > 0)
+            if (this.settings.get_string('scroll-action') === 'volume') {
+                const pct = this.system.nudgeVolume(-dir * 4);
+                if (pct !== null) {
+                    this.push({kind: 'hud', source: 'volume', icon: pct > 0 ? G.volHigh : G.volMute, tint: 'white',
+                        percent: pct, value: `${pct}%`, duration: 1500});
+                }
+            } else if (dir > 0) {
                 this._expand(true, false);
+            }
             return Clutter.EVENT_STOP;
         }
         const pages = this.pages();
@@ -459,6 +506,8 @@ export class Island {
             key = `${t.kind}:${t.kind === 'hud' ? t.source : t.id}`;
             if (t.kind === 'hud')
                 make = () => new HudView(this, t);
+            else if (t.kind === 'workspace')
+                make = () => new WorkspaceView(this, t);
             else if (t.kind === 'notification')
                 make = () => new NotificationView(this, t.n);
             else
@@ -548,8 +597,44 @@ export class Island {
         this._applyGeometry();
     }
 
+    // Which screen shows the island.
+    _pickMonitor() {
+        const lm = Main.layoutManager;
+        const mode = this.settings.get_string('monitor');
+        const builtin = () => {
+            const mm = global.backend.get_monitor_manager();
+            for (const c of ['eDP-1', 'eDP-2', 'LVDS-1', 'DSI-1']) {
+                const i = mm.get_monitor_for_connector(c);
+                if (i >= 0)
+                    return lm.monitors[i];
+            }
+            return null;
+        };
+        if (mode === 'laptop')
+            return builtin() ?? lm.primaryMonitor;
+        if (mode === 'external') {
+            const b = builtin();
+            return lm.monitors.find(m => m !== b) ?? b ?? lm.primaryMonitor;
+        }
+        if (mode === 'focused') {
+            const w = global.display.focus_window;
+            const i = w ? w.get_monitor() : global.display.get_current_monitor();
+            return lm.monitors[i] ?? lm.primaryMonitor;
+        }
+        return lm.primaryMonitor;
+    }
+
+    _followMonitor() {
+        const mon = this._pickMonitor();
+        if (mon === this._monitor)
+            return;
+        this._monitor = mon;
+        this._applyGeometry();
+    }
+
     _applyGeometry() {
-        const mon = Main.layoutManager.primaryMonitor;
+        this._monitor ??= this._pickMonitor();
+        const mon = this._monitor;
         if (!mon || this._destroyed)
             return;
         const inset = this.settings.get_int('pill-inset');
@@ -657,6 +742,7 @@ export class Island {
             } catch {}
         }
         this._signals = [];
+        Main.wm.removeKeybinding('toggle-shortcut');
         this._driver.destroy();
         for (const a of [this.pill, this.bubble, this._edge]) {
             Main.layoutManager.removeChrome(a);

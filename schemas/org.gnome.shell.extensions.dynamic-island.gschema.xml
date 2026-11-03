@@ -86,5 +86,44 @@
       <default>''</default>
       <summary>Pending alarm (HH:MM), kept across shell restarts</summary>
     </key>
+    <key name="monitor" type="s">
+      <choices>
+        <choice value="primary"/>
+        <choice value="focused"/>
+        <choice value="laptop"/>
+        <choice value="external"/>
+      </choices>
+      <default>'focused'</default>
+      <summary>Which screen shows the island</summary>
+      <description>primary, focused (follows the window you work in), laptop (built-in screen) or external (falls back to the laptop screen)</description>
+    </key>
+    <key name="scroll-action" type="s">
+      <choices>
+        <choice value="pages"/>
+        <choice value="volume"/>
+      </choices>
+      <default>'pages'</default>
+      <summary>Scrolling on the closed island: open pages, or change volume</summary>
+    </key>
+    <key name="show-workspaces" type="b">
+      <default>true</default>
+      <summary>Flash the workspace when you switch</summary>
+    </key>
+    <key name="laptop-alerts" type="b">
+      <default>true</default>
+      <summary>Alerts for power mode, Night Light, audio output, Caps Lock and keyboard layout</summary>
+    </key>
+    <key name="phone-alerts" type="b">
+      <default>true</default>
+      <summary>Phone connection and battery alerts (GSConnect)</summary>
+    </key>
+    <key name="toggle-shortcut" type="as">
+      <default><![CDATA[['<Super><Alt>i']]]></default>
+      <summary>Open or close the island</summary>
+    </key>
+    <key name="first-run" type="b">
+      <default>true</default>
+      <summary>Show the welcome hint once</summary>
+    </key>
   </schema>
 </schemalist>

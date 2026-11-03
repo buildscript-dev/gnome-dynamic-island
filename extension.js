@@ -9,6 +9,8 @@ import {MediaExtras} from './services/media-extras.js';
 import {SystemService} from './services/system.js';
 import {TimerService} from './services/timers.js';
 import {ShellHooks} from './services/shell-hooks.js';
+import {LaptopService} from './services/laptop.js';
+import {PhoneService} from './services/phone.js';
 
 export default class DynamicIslandExtension extends Extension {
     enable() {
@@ -18,6 +20,8 @@ export default class DynamicIslandExtension extends Extension {
         this._media = new MediaExtras(this._settings);
         this._system = new SystemService();
         this._timers = new TimerService(this._settings);
+        this._laptop = new LaptopService(this._system);
+        this._phone = new PhoneService();
 
         this._island = new Island({
             settings: this._settings,
@@ -27,6 +31,8 @@ export default class DynamicIslandExtension extends Extension {
             system: this._system,
             timers: this._timers,
             hooks: this._hooks,
+            laptop: this._laptop,
+            phone: this._phone,
         });
         this._dbus = new IslandDBus(this._island);
 
@@ -44,12 +50,14 @@ export default class DynamicIslandExtension extends Extension {
         this._dbus?.destroy();
         this._island?.destroy();
         this._hooks?.destroy();
+        this._phone?.destroy();
+        this._laptop?.destroy();
         this._timers?.destroy();
         this._system?.destroy();
         this._media?.destroy();
         this._mpris?.destroy();
         this._dbus = this._island = this._hooks = this._timers = null;
-        this._system = this._media = this._mpris = null;
+        this._system = this._media = this._mpris = this._laptop = this._phone = null;
         this._settings = null;
     }
 }

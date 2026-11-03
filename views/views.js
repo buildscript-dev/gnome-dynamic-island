@@ -6,7 +6,7 @@ import GLib from 'gi://GLib';
 import St from 'gi://St';
 import Pango from 'gi://Pango';
 
-import {G, C, formatTime, plain, lyricAt} from '../lib/model.js';
+import {G, C, PROFILES, formatTime, plain, lyricAt, volumeGlyph, batteryGlyph} from '../lib/model.js';
 import {TYPE, label, glyph, setGlyphTint, button, pillButton, Artwork, Waveform, LevelBar, color} from './widgets.js';
 
 const ROW = (spacing = 8, extra = {}) =>
@@ -232,7 +232,7 @@ export class ExpandedView {
         this.ctx = ctx;
         this.page = page;
         this.actor = new St.BoxLayout({x_expand: true, y_expand: true});
-        const body = {player: PlayerPage, home: HomePage, history: HistoryPage}[page] ?? HomePage;
+        const body = {player: PlayerPage, home: HomePage, controls: ControlsPage, history: HistoryPage}[page] ?? HomePage;
         this._page = new body(ctx);
         this._page.actor.x_expand = true;
         this.actor.add_child(this._page.actor);
@@ -361,6 +361,8 @@ class HomePage {
         this._right.add_child(this._timerRow);
         this._right.add_child(this._stopwatchRow);
         this._right.add_child(this._miscRow);
+        this._status = ROW(12, {style: 'spacing: 12px;'});
+        this._right.add_child(this._status);
         this._sig = '';
         this.update();
     }
@@ -452,6 +454,31 @@ class HomePage {
             this._timerText.text = formatTime(Math.ceil(timers.timerLeft));
         if (this._swText)
             this._swText.text = timers.stopwatch ? formatTime(timers.stopwatchElapsed) : 'Stopwatch';
+        this._updateStatus();
+    }
+
+    // Laptop and phone battery at a glance.
+    _updateStatus() {
+        const {system, phone} = this.ctx;
+        const parts = [];
+        const b = system.battery;
+        if (b.present)
+            parts.push([batteryGlyph(b.percent, b.charging), b.charging ? 'green' : b.percent <= 20 ? 'red' : 'secondary', `${b.percent}%`]);
+        for (const p of phone?.phones ?? []) {
+            if (p.connected)
+                parts.push([G.phone, 'secondary', p.battery ? `${p.name} ${p.battery.level}%` : p.name]);
+        }
+        const sig = JSON.stringify(parts);
+        if (sig === this._statusSig)
+            return;
+        this._statusSig = sig;
+        this._status.destroy_all_children();
+        for (const [g, tint, text] of parts) {
+            const r = ROW(4);
+            r.add_child(glyph(g, {size: 13, tint}));
+            r.add_child(label(text, {size: TYPE.caption, tint: 'secondary', ellipsize: false}));
+            this._status.add_child(r);
+        }
     }
 }
 
@@ -491,6 +518,167 @@ class HistoryPage {
             row.add_child(label(it.time.format('%H:%M'), {size: TYPE.caption, tint: 'secondary', ellipsize: false}));
             this._list.add_child(row);
         }
+    }
+
+    update() {}
+}
+
+// --- control center ---------------------------------------------------------------
+
+class Tile {
+    constructor(g, name, onClick, onTint = 'blue') {
+        this.actor = COL(3, {style: 'spacing: 3px;'});
+        this._btn = new St.Button({style_class: 'di-tile', reactive: true, can_focus: true,
+            accessible_name: name, x_align: Clutter.ActorAlign.CENTER});
+        this._glyph = glyph(g, {size: 17});
+        this._btn.set_child(this._glyph);
+        this._btn.connect('clicked', () => onClick());
+        this._label = label(name, {size: TYPE.caption2, tint: 'secondary', ellipsize: false, align: 'center'});
+        this._label.x_align = Clutter.ActorAlign.CENTER;
+        this.actor.add_child(this._btn);
+        this.actor.add_child(this._label);
+        this._onTint = onTint;
+        this._on = null;
+    }
+
+    set(on, g = null, name = null, tint = null) {
+        const t = tint ?? this._onTint;
+        const key = `${on}|${g}|${name}|${t}`;
+        if (key === this._key)
+            return;
+        this._key = key;
+        if (g)
+            this._glyph.text = g;
+        if (name)
+            this._label.text = name;
+        this._btn.style = on ? `background-color: ${color(t)};` : '';
+        setGlyphTint(this._glyph, on && t !== 'white' ? 'white' : on ? '#000000' : 'white');
+    }
+}
+
+class ControlsPage {
+    constructor(ctx) {
+        this.ctx = ctx;
+        const L = ctx.laptop;
+        this.actor = COL(10, {style: 'spacing: 10px; padding: 14px 26px 12px 22px;', x_expand: true, y_expand: true,
+            y_align: Clutter.ActorAlign.CENTER});
+
+        const tiles = ROW(10, {style: 'spacing: 10px;', x_align: Clutter.ActorAlign.CENTER});
+        this._wifi = new Tile(G.wifi, 'Wi-Fi', () => L.toggleWifi());
+        this._bt = new Tile(G.bluetooth, 'Bluetooth', () => L.toggleBluetooth());
+        this._focus = new Tile(G.moon, 'Focus', () => (ctx.system.dnd = !ctx.system.dnd), 'indigo');
+        this._night = new Tile(G.moonStars, 'Night Light', () => L.toggleNightLight(), 'orange');
+        this._dark = new Tile(G.halfMoon, 'Dark Style', () => L.toggleDarkStyle(), 'white');
+        this._awake = new Tile(G.coffee, 'Stay Awake', () => L.toggleStayAwake(), 'orange');
+        this._power = new Tile(G.gauge, 'Balanced', () => L.cycleProfile(), 'white');
+        for (const t of [this._wifi, this._bt, this._focus, this._night, this._dark, this._awake, this._power])
+            tiles.add_child(t.actor);
+        this.actor.add_child(tiles);
+
+        // Volume and brightness sliders.
+        const sliders = ROW(14, {style: 'spacing: 14px;'});
+        const volRow = ROW(6, {x_expand: true});
+        this._mute = button(G.volHigh, () => L.toggleMute(), {size: 15, pad: 5, accessible: 'Mute'});
+        this._vol = new LevelBar({width: 150, height: 6, onSeek: f => L.setVolume(f)});
+        volRow.add_child(this._mute);
+        volRow.add_child(this._vol.actor);
+        sliders.add_child(volRow);
+        this._briRow = ROW(6, {x_expand: true});
+        this._briRow.add_child(glyph(G.brightHigh, {size: 15}));
+        this._bri = new LevelBar({width: 150, height: 6, onSeek: f => L.setBrightness(f)});
+        this._briRow.add_child(this._bri.actor);
+        sliders.add_child(this._briRow);
+        this.actor.add_child(sliders);
+
+        // Actions, battery and phone.
+        const actions = ROW(6, {style: 'spacing: 6px;'});
+        const act = (g, name, fn) => {
+            const b = button(g, () => {
+                ctx.collapse();
+                fn();
+            }, {size: 15, pad: 7, bg: true, accessible: name});
+            actions.add_child(b);
+        };
+        act(G.camera, 'Screenshot', () => L.screenshot());
+        act(G.gear, 'Settings', () => L.openSettings());
+        act(G.lock, 'Lock', () => L.lock());
+        act(G.power, 'Power Off', () => L.powerMenu());
+        actions.add_child(SPACER());
+        this._phoneBox = ROW(6);
+        actions.add_child(this._phoneBox);
+        this._batt = ROW(4);
+        this._battGlyph = glyph(G.battery, {size: 14, tint: 'secondary'});
+        this._battText = label('', {size: TYPE.footnote, weight: 600, ellipsize: false, mono: true});
+        this._batt.add_child(this._battGlyph);
+        this._batt.add_child(this._battText);
+        actions.add_child(this._batt);
+        this.actor.add_child(actions);
+        this.update();
+    }
+
+    update() {
+        const {laptop: L, system, phone} = this.ctx;
+        this._wifi.set(L.wifiOn, L.wifiOn ? G.wifi : G.wifiOff, L.wifiName || 'Wi-Fi');
+        this._bt.set(L.bluetoothOn, L.bluetoothOn ? G.bluetooth : G.bluetoothOff);
+        this._focus.set(system.dnd);
+        this._night.set(L.nightLight);
+        this._dark.set(L.darkStyle);
+        this._awake.set(L.stayAwake);
+        const prof = PROFILES[L.profile];
+        this._power.actor.visible = !!prof;
+        if (prof)
+            this._power.set(L.profile !== 'balanced', prof.glyph, prof.name, prof.tint);
+
+        const v = L.volume;
+        if (v) {
+            this._vol.set(v.muted ? 0 : v.percent / 100);
+            this._mute.glyph.text = volumeGlyph(v.percent, v.muted);
+        }
+        const bri = L.brightness;
+        this._briRow.visible = bri !== null;
+        if (bri !== null)
+            this._bri.set(bri);
+
+        const b = system.battery;
+        this._batt.visible = b.present;
+        if (b.present) {
+            this._battGlyph.text = batteryGlyph(b.percent, b.charging);
+            setGlyphTint(this._battGlyph, b.charging ? 'green' : b.percent <= 20 ? 'red' : 'secondary');
+            this._battText.text = `${b.percent}%`;
+        }
+
+        const p = (phone?.phones ?? []).find(x => x.connected);
+        const psig = p ? `${p.name}|${p.battery?.level}` : '';
+        if (psig !== this._psig) {
+            this._psig = psig;
+            this._phoneBox.destroy_all_children();
+            if (p) {
+                this._phoneBox.add_child(button(G.phone, () => p.ring(), {size: 14, pad: 6, accessible: `Ring ${p.name}`}));
+                this._phoneBox.add_child(label(p.battery ? `${p.battery.level}%` : p.name,
+                    {size: TYPE.footnote, tint: 'secondary', ellipsize: false}));
+            }
+        }
+    }
+}
+
+// --- workspace flash ----------------------------------------------------------------
+
+export class WorkspaceView {
+    constructor(ctx, a) {
+        this.ctx = ctx;
+        this.actor = ROW(6, {style: 'spacing: 6px; padding: 0 14px;', x_align: Clutter.ActorAlign.CENTER});
+        const n = Math.min(a.count, 12);
+        for (let i = 0; i < n; i++) {
+            const on = i === a.index;
+            this.actor.add_child(new St.Widget({width: on ? 18 : 6, height: 6, y_align: Clutter.ActorAlign.CENTER,
+                style: `border-radius: 6px; background-color: ${on ? '#FFFFFF' : 'rgba(255,255,255,0.3)'};`}));
+        }
+        this.actor.add_child(label(String(a.index + 1), {size: TYPE.footnote, weight: 600, ellipsize: false,
+            tint: 'secondary', mono: true}));
+    }
+
+    measure() {
+        this.contentWidth = textWidth(this.actor) + 28;
     }
 
     update() {}

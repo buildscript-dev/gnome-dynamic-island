@@ -199,10 +199,31 @@ export class LevelBar {
         this._fraction = 0;
         this.actor.connect('notify::width', () => this._layout());
         if (onSeek) {
-            this.actor.connect('button-release-event', (a, event) => {
+            const seek = event => {
                 const [x] = event.get_coords();
-                const [ax] = a.get_transformed_position();
-                onSeek(Math.max(0, Math.min(1, (x - ax) / Math.max(1, a.width))));
+                const [ax] = this.actor.get_transformed_position();
+                const f = Math.max(0, Math.min(1, (x - ax) / Math.max(1, this.actor.width)));
+                this._fraction = f;
+                this._layout();
+                onSeek(f);
+            };
+            // Click or drag to set.
+            this.actor.connect('button-press-event', (_a, event) => {
+                this._dragging = true;
+                seek(event);
+                return Clutter.EVENT_STOP;
+            });
+            this.actor.connect('motion-event', (_a, event) => {
+                if (this._dragging && (event.get_state() & Clutter.ModifierType.BUTTON1_MASK))
+                    seek(event);
+                else
+                    this._dragging = false;
+                return Clutter.EVENT_PROPAGATE;
+            });
+            this.actor.connect('button-release-event', (_a, event) => {
+                if (this._dragging)
+                    seek(event);
+                this._dragging = false;
                 return Clutter.EVENT_STOP;
             });
             // Thicken under the pointer to show it can be scrubbed.
@@ -223,6 +244,9 @@ export class LevelBar {
     }
 
     set(fraction) {
+        // Ignore outside updates while the pointer is dragging the bar.
+        if (this._dragging)
+            return;
         this._fraction = Math.max(0, Math.min(1, fraction || 0));
         this._layout();
     }
