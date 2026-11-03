@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.dynamic-island" path="/org/gnome/shell/extensions/dynamic-island/">
+    <key name="hide-top-bar" type="b">
+      <default>true</default>
+      <summary>Hide the GNOME top bar (it comes back in the overview)</summary>
+    </key>
+    <key name="show-when-idle" type="b">
+      <default>true</default>
+      <summary>Keep the island on screen when nothing is happening</summary>
+    </key>
+    <key name="show-clock" type="b">
+      <default>true</default>
+      <summary>Show the clock inside the idle island</summary>
+    </key>
+    <key name="clock-format" type="s">
+      <default>'%H:%M'</default>
+      <summary>Clock format (GLib.DateTime format, e.g. %H:%M or %l:%M %p)</summary>
+    </key>
+    <key name="open-on-hover" type="b">
+      <default>true</default>
+      <summary>Open the island when the pointer rests on it</summary>
+    </key>
+    <key name="hover-delay" type="i">
+      <range min="0" max="2000"/>
+      <default>320</default>
+      <summary>Hover delay in ms</summary>
+    </key>
+    <key name="replace-osd" type="b">
+      <default>true</default>
+      <summary>Show volume and brightness in the island instead of GNOME's pop-up</summary>
+    </key>
+    <key name="show-notifications" type="b">
+      <default>true</default>
+      <summary>Show notifications in the island instead of GNOME's banners</summary>
+    </key>
+    <key name="online-extras" type="b">
+      <default>true</default>
+      <summary>Allow network use: album art for streaming players and synced lyrics</summary>
+    </key>
+    <key name="show-lyrics" type="b">
+      <default>true</default>
+      <summary>Show synced lyrics from lrclib.net</summary>
+    </key>
+    <key name="use-cava" type="b">
+      <default>true</default>
+      <summary>Drive the waveform from the real audio with cava</summary>
+    </key>
+    <key name="artwork-tint" type="b">
+      <default>true</default>
+      <summary>Tint the music view with the album art color</summary>
+    </key>
+    <key name="show-mic-indicator" type="b">
+      <default>true</default>
+      <summary>Orange dot while an app uses the microphone</summary>
+    </key>
+    <key name="reduce-motion" type="b">
+      <default>false</default>
+      <summary>Settle without bouncing</summary>
+    </key>
+    <key name="haptics" type="b">
+      <default>true</default>
+      <summary>Soft tick when the island opens</summary>
+    </key>
+    <key name="island-width" type="i">
+      <range min="60" max="300"/>
+      <default>96</default>
+      <summary>Idle island width</summary>
+    </key>
+    <key name="island-height" type="i">
+      <range min="20" max="60"/>
+      <default>30</default>
+      <summary>Idle island height</summary>
+    </key>
+    <key name="pill-inset" type="i">
+      <range min="0" max="40"/>
+      <default>6</default>
+      <summary>Gap between the island and the top edge</summary>
+    </key>
+    <key name="notification-width" type="i">
+      <range min="300" max="700"/>
+      <default>360</default>
+      <summary>Island width for notifications</summary>
+    </key>
+    <key name="alarm-time" type="s">
+      <default>''</default>
+      <summary>Pending alarm (HH:MM), kept across shell restarts</summary>
+    </key>
+  </schema>
+</schemalist>

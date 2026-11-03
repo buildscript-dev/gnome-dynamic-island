@@ -1,0 +1,54 @@
+/* Always solid black, in every state. */
+.di-pill {
+  background-color: #000000;
+}
+
+.di-text {
+  color: #ffffff;
+}
+
+.di-glyph {
+  font-family: "Phosphor-Fill";
+  color: #ffffff;
+}
+
+.di-mic-dot {
+  background-color: #FF9F0A;
+  border-radius: 6px;
+}
+
+.di-btn {
+  border-radius: 999px;
+  background-color: transparent;
+  transition-duration: 120ms;
+}
+
+.di-btn:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.di-btn:active {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+.di-btn-bg {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.di-btn-bg:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.di-pill-btn {
+  border-radius: 999px;
+  padding: 5px 11px;
+  transition-duration: 120ms;
+}
+
+.di-pill-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.di-notif-icon {
+  border-radius: 9px;
+}

@@ -1,0 +1,9 @@
+{
+  "uuid": "dynamic-island@buildscript-dev.github.io",
+  "name": "Dynamic Island",
+  "description": "A solid black, iPhone-style Dynamic Island for GNOME. It springs open for music, timers, recording, notifications, volume, brightness and system alerts, then gets out of the way. Ported from omarchy-dynamic-island.",
+  "shell-version": ["50"],
+  "url": "https://github.com/buildscript-dev/gnome-dynamic-island",
+  "settings-schema": "org.gnome.shell.extensions.dynamic-island",
+  "version-name": "0.1.0"
+}
