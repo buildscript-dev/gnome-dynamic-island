@@ -121,6 +121,15 @@
       <default><![CDATA[['<Super><Alt>i']]]></default>
       <summary>Open or close the island</summary>
     </key>
+    <key name="style" type="s">
+      <choices>
+        <choice value="macbook"/>
+        <choice value="floating"/>
+      </choices>
+      <default>'macbook'</default>
+      <summary>Island shape</summary>
+      <description>macbook: attached to the top edge with a flat top, like the MacBook Pro PROLED XDR. floating: a free-floating pill, like the iPhone.</description>
+    </key>
     <key name="first-run" type="b">
       <default>true</default>
       <summary>Show the welcome hint once</summary>

@@ -10,6 +10,17 @@ comes back in the overview.
 
 ![control center](media-controls.png)
 
+## MacBook style
+
+The default **MacBook** style is measured from Apple's MacBook Pro with PROLED
+XDR Display using [REA](https://github.com/morluto/rea): the island hangs from
+the top edge with a flat top, bottom corners of ~0.155 × its height, and a
+stacked 1.6 : 1 player. Turn the top bar back on to get the macOS look, with
+the island in the middle of the bar. Details: [docs/macbook-measurements.md](docs/macbook-measurements.md).
+The **iPhone** style keeps the floating pill.
+
+![MacBook style](media-macbook.png)
+
 ## Install
 
 ```sh

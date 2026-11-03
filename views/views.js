@@ -232,7 +232,8 @@ export class ExpandedView {
         this.ctx = ctx;
         this.page = page;
         this.actor = new St.BoxLayout({x_expand: true, y_expand: true});
-        const body = {player: PlayerPage, home: HomePage, controls: ControlsPage, history: HistoryPage}[page] ?? HomePage;
+        const body = {player: ctx.macbook ? StackedPlayerPage : PlayerPage, home: HomePage, controls: ControlsPage,
+            history: HistoryPage}[page] ?? HomePage;
         this._page = new body(ctx);
         this._page.actor.x_expand = true;
         this.actor.add_child(this._page.actor);
@@ -332,6 +333,48 @@ class PlayerPage {
             this._lyric.opacity = 0;
             this._lyric.ease({opacity: 255, duration: 220, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
         }
+    }
+}
+
+// MacBook layout, as on the PROLED XDR MacBook Pro: art and titles on top,
+// a full-width scrubber, then large transport controls.
+class StackedPlayerPage extends PlayerPage {
+    constructor(ctx) {
+        super(ctx);
+        const old = this.actor;
+        // Reuse the parts PlayerPage built, in a stacked arrangement.
+        const parts = [this._art.actor, this._title, this._artist, this._wave.actor, this._lyric,
+            this._elapsed, this._bar.actor, this._remain, this._play];
+        for (const a of parts)
+            a.get_parent()?.remove_child(a);
+
+        this.actor = COL(12, {style: 'spacing: 12px; padding: 26px 30px 20px 30px;', x_expand: true, y_expand: true});
+        const top = ROW(14, {style: 'spacing: 14px;'});
+        this._art.actor.set_size(64, 64);
+        top.add_child(this._art.actor);
+        const titles = COL(1, {x_expand: true});
+        this._title.style = this._title.style.replace(/font-size: \d+px/, 'font-size: 17px');
+        titles.add_child(this._title);
+        titles.add_child(this._artist);
+        top.add_child(titles);
+        top.add_child(this._wave.actor);
+        this.actor.add_child(top);
+        this.actor.add_child(this._lyric);
+
+        const scrub = ROW(10, {style: 'spacing: 10px;'});
+        scrub.add_child(this._elapsed);
+        scrub.add_child(this._bar.actor);
+        scrub.add_child(this._remain);
+        this.actor.add_child(scrub);
+
+        const ctl = ROW(44, {x_align: Clutter.ActorAlign.CENTER, style: 'spacing: 44px;'});
+        ctl.add_child(button(G.prev, () => ctx.mpris.active?.previous(), {size: 30, accessible: 'Previous'}));
+        this._play.glyph.style = this._play.glyph.style.replace(/font-size: \d+px/, 'font-size: 40px');
+        this._play.glyph._size = 40;
+        ctl.add_child(this._play);
+        ctl.add_child(button(G.next, () => ctx.mpris.active?.next(), {size: 30, accessible: 'Next'}));
+        this.actor.add_child(ctl);
+        old.destroy();
     }
 }
 

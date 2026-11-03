@@ -76,13 +76,18 @@ export default class DynamicIslandPrefs extends ExtensionPreferences {
         group(general, '', [tryRow]);
 
         group(general, 'Island', [
+            comboRow(s, 'style', 'Style', 'Shape measured from the MacBook Pro PROLED XDR, or the iPhone floating pill', [
+                ['macbook', 'MacBook (attached to the top edge)'],
+                ['floating', 'iPhone (floating pill)'],
+            ]),
             comboRow(s, 'monitor', 'Screen', 'Where the island lives with an external monitor plugged in', [
                 ['focused', 'Follow the window I work in'],
                 ['laptop', 'Laptop screen'],
                 ['external', 'External monitor'],
                 ['primary', 'Primary display'],
             ]),
-            switchRow(s, 'hide-top-bar', 'Hide the top bar', 'The bar comes back in the Activities overview'),
+            switchRow(s, 'hide-top-bar', 'Hide the top bar',
+                'Off + MacBook style: the island sits in the middle of the bar, like on a Mac'),
             switchRow(s, 'show-when-idle', 'Show when idle',
                 'Off: the island hides until something happens, or you touch the top edge'),
             switchRow(s, 'show-clock', 'Clock in the island'),

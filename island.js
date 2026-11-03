@@ -11,7 +11,7 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
-import {G, geometry, plain, formatTime} from './lib/model.js';
+import {G, geometry, macbookShape, plain, formatTime} from './lib/model.js';
 import {Spring, SpringDriver} from './lib/spring.js';
 import {glyph} from './views/widgets.js';
 import {IdleView, CompactView, HudView, AlertView, NotificationView, ExpandedView, WorkspaceView, liveGlyph} from './views/views.js';
@@ -58,7 +58,34 @@ export class Island {
     }
 
     get idleHeight() {
+        // MacBook style with the top bar shown: the island is as tall as the bar,
+        // like the island and the macOS menu bar.
+        if (this.macbook && this._panelShown)
+            return Math.max(20, Math.round(Main.panel.height || this.settings.get_int('island-height')));
         return this.settings.get_int('island-height');
+    }
+
+    get macbook() {
+        return this.settings.get_string('style') === 'macbook';
+    }
+
+    get _panelShown() {
+        return !this.settings.get_boolean('hide-top-bar');
+    }
+
+    // With the island in the middle of the top bar, it takes over the clock.
+    _syncPanelClock() {
+        const clock = Main.panel.statusArea.dateMenu?.container;
+        if (!clock)
+            return;
+        const hide = this.macbook && this._panelShown;
+        if (hide && !this._clockHidden) {
+            clock.hide();
+            this._clockHidden = true;
+        } else if (!hide && this._clockHidden) {
+            clock.show();
+            this._clockHidden = false;
+        }
     }
 
     // --- construction -----------------------------------------------------------
@@ -536,8 +563,11 @@ export class Island {
             this._swapView(key, make);
         this._mode = mode;
 
-        const g = geometry(mode, this.idleWidth, this.idleHeight, this._view?.contentWidth ?? 0,
+        let g = geometry(mode, this.idleWidth, this.idleHeight, this._view?.contentWidth ?? 0,
             this.settings.get_int('notification-width'));
+        if (this.macbook)
+            g = macbookShape(g, mode, mode === 'expanded' ? pages[this._page] : null);
+        this._syncPanelClock();
         this._setTarget(g, mode);
         this._syncBubble(mode === 'compact' ? live[1] : null);
         this._syncMicDot(mode);
@@ -641,9 +671,10 @@ export class Island {
         const squish = 1 - 0.04 * Math.max(-1, Math.min(1, this._squish.value));
         const w = Math.max(1, Math.min(mon.width - 16, this._w.value * squish));
         const h = Math.max(0, Math.min(mon.height - 16, this._h.value * squish));
-        const r = Math.max(0, Math.min(this._r.value, h / 2, w / 2));
+        const flat = this.macbook;
+        const r = Math.max(0, Math.min(this._r.value, flat ? h : h / 2, w / 2));
         const x = Math.round(mon.x + (mon.width - w) / 2);
-        const y = Math.round(mon.y + inset);
+        const y = Math.round(mon.y + (flat ? 0 : inset));
         this.pill.set_position(x, y);
         this.pill.set_size(Math.round(w), Math.round(h));
         const hidden = this._targetMode === 'hidden';
@@ -651,9 +682,11 @@ export class Island {
         this.pill.opacity = opacity;
         this.pill.visible = h > 0.5;
         const radius = Math.round(r);
-        if (radius !== this._lastRadius) {
-            this._lastRadius = radius;
-            this.pill.style = `border-radius: ${radius}px;`;
+        const shape = `${flat}|${radius}`;
+        if (shape !== this._lastShape) {
+            this._lastShape = shape;
+            // Flat top: the island hangs from the top edge, only its bottom is rounded.
+            this.pill.style = flat ? `border-radius: 0 0 ${radius}px ${radius}px;` : `border-radius: ${radius}px;`;
         }
         const tw = this._target?.w ?? w;
         this._stage.set_position(Math.round((w - tw) / 2), 0);
@@ -667,7 +700,8 @@ export class Island {
         const bx = x + w + (BUBBLE_GAP + bh) * s - bh;
         this.bubble.set_size(bh, bh);
         this.bubble.set_position(Math.round(bx), y);
-        this.bubble.style = `border-radius: ${Math.ceil(bh / 2)}px;`;
+        const br = Math.ceil(bh / 2);
+        this.bubble.style = flat ? `border-radius: 0 0 ${br}px ${br}px;` : `border-radius: ${br}px;`;
         this.bubble.opacity = Math.round(255 * Math.max(0, Math.min(1, s)));
         this.bubble.visible = s > 0.02;
 
@@ -743,6 +777,8 @@ export class Island {
         }
         this._signals = [];
         Main.wm.removeKeybinding('toggle-shortcut');
+        if (this._clockHidden)
+            Main.panel.statusArea.dateMenu?.container.show();
         this._driver.destroy();
         for (const a of [this.pill, this.bubble, this._edge]) {
             Main.layoutManager.removeChrome(a);
